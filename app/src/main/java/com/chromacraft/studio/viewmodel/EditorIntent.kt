@@ -72,6 +72,7 @@ sealed interface EditorIntent {
     data class ReorderLayers(val fromIndex: Int, val toIndex: Int) : EditorIntent
     data class DeleteLayer(val layerId: String) : EditorIntent
     data class DuplicateLayer(val layerId: String) : EditorIntent
+    data class LockLayer(val layerId: String, val isLocked: Boolean) : EditorIntent
 
     data class UpdateAdjustments(val adjustments: AdjustmentProperties) : EditorIntent
     data class UpdateToneCurves(val curves: ToneCurveProperties) : EditorIntent

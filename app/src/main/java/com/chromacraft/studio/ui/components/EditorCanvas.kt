@@ -173,7 +173,7 @@ fun EditorCanvas(
                             detectDragGestures(
                                 onDragStart = { touchOffset ->
                                     val selected = uiState.selectedLayer
-                                    if (selected != null && !selected.isLocked) {
+                                    if (selected != null) {
                                         val corners = TransformEngine.getTransformedCorners(
                                             width = fittedWidth,
                                             height = fittedHeight,
@@ -184,41 +184,49 @@ fun EditorCanvas(
                                             rotationDegrees = selected.rotationDegrees
                                         )
 
-                                        activeGizmoHandle = TransformEngine.hitTestGizmo(
+                                        val handle = TransformEngine.hitTestGizmo(
                                             touchX = touchOffset.x,
                                             touchY = touchOffset.y,
                                             corners = corners,
                                             handleRadiusPx = with(density) { 36.dp.toPx() }
                                         )
 
-                                        when (activeGizmoHandle) {
-                                            TransformEngine.GizmoHandle.DELETE -> {
-                                                onIntent(EditorIntent.DeleteLayer(selected.id))
-                                                activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                        if (selected.isLocked) {
+                                            if (handle == TransformEngine.GizmoHandle.LOCK_TOGGLE) {
+                                                onIntent(EditorIntent.LockLayer(selected.id, false))
                                             }
+                                            activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                        } else {
+                                            activeGizmoHandle = handle
+                                            when (activeGizmoHandle) {
+                                                TransformEngine.GizmoHandle.DELETE -> {
+                                                    onIntent(EditorIntent.DeleteLayer(selected.id))
+                                                    activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                                }
 
-                                            TransformEngine.GizmoHandle.DUPLICATE -> {
-                                                onIntent(EditorIntent.DuplicateLayer(selected.id))
-                                                activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                                TransformEngine.GizmoHandle.DUPLICATE -> {
+                                                    onIntent(EditorIntent.DuplicateLayer(selected.id))
+                                                    activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                                }
+
+                                                TransformEngine.GizmoHandle.LOCK_TOGGLE -> {
+                                                    onIntent(EditorIntent.LockLayer(selected.id, true))
+                                                    activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                                }
+
+                                                TransformEngine.GizmoHandle.SCALE_ROTATE -> {
+                                                    val layerCenterX = fittedWidth / 2f + selected.translationX
+                                                    val layerCenterY = fittedHeight / 2f + selected.translationY
+                                                    val dx = touchOffset.x - layerCenterX
+                                                    val dy = touchOffset.y - layerCenterY
+                                                    initialDistToCenter = hypot(dx, dy).coerceAtLeast(1f)
+                                                    initialAngleToCenter = Math.toDegrees(atan2(dy, dx).toDouble()).toFloat()
+                                                    initialLayerScale = selected.scaleX
+                                                    initialLayerRotation = selected.rotationDegrees
+                                                }
+
+                                                else -> Unit
                                             }
-
-                                            TransformEngine.GizmoHandle.LOCK_TOGGLE -> {
-                                                onIntent(EditorIntent.LockLayer(selected.id, !selected.isLocked))
-                                                activeGizmoHandle = TransformEngine.GizmoHandle.NONE
-                                            }
-
-                                            TransformEngine.GizmoHandle.SCALE_ROTATE -> {
-                                                val layerCenterX = fittedWidth / 2f + selected.translationX
-                                                val layerCenterY = fittedHeight / 2f + selected.translationY
-                                                val dx = touchOffset.x - layerCenterX
-                                                val dy = touchOffset.y - layerCenterY
-                                                initialDistToCenter = hypot(dx, dy).coerceAtLeast(1f)
-                                                initialAngleToCenter = Math.toDegrees(atan2(dy, dx).toDouble()).toFloat()
-                                                initialLayerScale = selected.scaleX
-                                                initialLayerRotation = selected.rotationDegrees
-                                            }
-
-                                            else -> Unit
                                         }
                                     } else {
                                         activeGizmoHandle = TransformEngine.GizmoHandle.NONE
@@ -227,6 +235,7 @@ fun EditorCanvas(
                                 onDrag = { change, dragAmount ->
                                     change.consume()
                                     val selected = uiState.selectedLayer ?: return@detectDragGestures
+                                    if (selected.isLocked) return@detectDragGestures
 
                                     when (activeGizmoHandle) {
                                         TransformEngine.GizmoHandle.BODY -> {
@@ -457,8 +466,9 @@ private fun drawGizmo(
 
     // 4. Esquina Inferior Izquierda: Bloqueo / Desbloqueo
     nativeCanvas.drawCircle(corners[6], corners[7], radius * 0.85f, handleBgPaint)
+    val lockColor = if (layer.isLocked) 0xFFFFB300.toInt() else 0xFF7C4DFF.toInt()
     val lockPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF7C4DFF.toInt()
+        color = lockColor
         strokeWidth = 2f
         style = AndroidPaint.Style.STROKE
     }

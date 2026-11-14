@@ -48,6 +48,7 @@ sealed class Layer(
     abstract fun copyWithOpacity(opacity: Float): Layer
     abstract fun copyWithBlendMode(blendMode: BlendModeType): Layer
     abstract fun copyWithMask(mask: LayerMask?): Layer
+    abstract fun copyWithLock(isLocked: Boolean): Layer
 }
 
 /**
@@ -101,6 +102,7 @@ data class ImageLayer(
     override fun copyWithOpacity(opacity: Float): ImageLayer = copy(opacity = opacity)
     override fun copyWithBlendMode(blendMode: BlendModeType): ImageLayer = copy(blendMode = blendMode)
     override fun copyWithMask(mask: LayerMask?): ImageLayer = copy(mask = mask)
+    override fun copyWithLock(isLocked: Boolean): ImageLayer = copy(isLocked = isLocked)
 }
 
 /**
@@ -149,6 +151,7 @@ data class DrawingLayer(
     override fun copyWithOpacity(opacity: Float): DrawingLayer = copy(opacity = opacity)
     override fun copyWithBlendMode(blendMode: BlendModeType): DrawingLayer = copy(blendMode = blendMode)
     override fun copyWithMask(mask: LayerMask?): DrawingLayer = copy(mask = mask)
+    override fun copyWithLock(isLocked: Boolean): DrawingLayer = copy(isLocked = isLocked)
 }
 
 /**
@@ -197,6 +200,7 @@ data class TextLayer(
     override fun copyWithOpacity(opacity: Float): TextLayer = copy(opacity = opacity)
     override fun copyWithBlendMode(blendMode: BlendModeType): TextLayer = copy(blendMode = blendMode)
     override fun copyWithMask(mask: LayerMask?): TextLayer = copy(mask = mask)
+    override fun copyWithLock(isLocked: Boolean): TextLayer = copy(isLocked = isLocked)
 }
 
 /**
@@ -245,4 +249,5 @@ data class StickerLayer(
     override fun copyWithOpacity(opacity: Float): StickerLayer = copy(opacity = opacity)
     override fun copyWithBlendMode(blendMode: BlendModeType): StickerLayer = copy(blendMode = blendMode)
     override fun copyWithMask(mask: LayerMask?): StickerLayer = copy(mask = mask)
+    override fun copyWithLock(isLocked: Boolean): StickerLayer = copy(isLocked = isLocked)
 }

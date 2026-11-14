@@ -23,6 +23,8 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.InvertColors
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -140,6 +142,7 @@ fun LayerManagerContent(
                         canMoveDown = actualIndex > 0,
                         onSelect = { onIntent(EditorIntent.SelectLayer(layer.id)) },
                         onToggleVisibility = { onIntent(EditorIntent.UpdateLayerVisibility(layer.id, !layer.isVisible)) },
+                        onToggleLock = { onIntent(EditorIntent.LockLayer(layer.id, !layer.isLocked)) },
                         onMoveUp = { onIntent(EditorIntent.ReorderLayers(actualIndex, actualIndex + 1)) },
                         onMoveDown = { onIntent(EditorIntent.ReorderLayers(actualIndex, actualIndex - 1)) },
                         onDuplicate = { onIntent(EditorIntent.DuplicateLayer(layer.id)) },
@@ -163,6 +166,7 @@ private fun LayerCardItem(
     canMoveDown: Boolean,
     onSelect: () -> Unit,
     onToggleVisibility: () -> Unit,
+    onToggleLock: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onDuplicate: () -> Unit,
@@ -198,6 +202,15 @@ private fun LayerCardItem(
                         imageVector = if (layer.isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                         contentDescription = "Visibilidad",
                         tint = if (layer.isVisible) StudioAccent else TextMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                IconButton(onClick = onToggleLock, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = if (layer.isLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                        contentDescription = "Bloqueo",
+                        tint = if (layer.isLocked) Color(0xFFFFB300) else TextMuted,
                         modifier = Modifier.size(18.dp)
                     )
                 }

@@ -466,6 +466,16 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 triggerAutoSave()
             }
 
+            is EditorIntent.LockLayer -> {
+                saveHistorySnapshot(if (intent.isLocked) "Bloquear Capa" else "Desbloquear Capa")
+                val layers = _uiState.value.layers.map { layer ->
+                    if (layer.id == intent.layerId) layer.copyWithLock(intent.isLocked) else layer
+                }
+                _uiState.update { it.copy(layers = layers) }
+                syncHistoryState()
+                triggerAutoSave()
+            }
+
             is EditorIntent.UpdateAdjustments -> {
                 _uiState.update { state ->
                     val updatedLayers = state.layers.map { layer ->
