@@ -37,14 +37,14 @@ object BitmapUtils {
             val contentResolver = context.contentResolver
 
             // 1. Decodificar solo límites (inJustDecodeBounds) para no asignar memoria
-            var stream: InputStream? = contentResolver.openInputStream(uri)
+            val boundsStream = contentResolver.openInputStream(uri)
                 ?: return@withContext Result.failure(Exception("No se pudo abrir el flujo de datos de la imagen"))
 
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-            BitmapFactory.decodeStream(stream, null, options)
-            stream.close()
+            BitmapFactory.decodeStream(boundsStream, null, options)
+            boundsStream.close()
 
             // 2. Calcular factor de submuestreo seguro en potencia de 2
             options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
@@ -52,9 +52,10 @@ object BitmapUtils {
             options.inPreferredConfig = Bitmap.Config.ARGB_8888
 
             // 3. Decodificar imagen optimizada
-            stream = contentResolver.openInputStream(uri)
-            val decodedBitmap = BitmapFactory.decodeStream(stream, null, options)
-            stream?.close()
+            val decodeStream = contentResolver.openInputStream(uri)
+                ?: return@withContext Result.failure(Exception("No se pudo abrir el flujo de decodificación"))
+            val decodedBitmap = BitmapFactory.decodeStream(decodeStream, null, options)
+            decodeStream.close()
 
             if (decodedBitmap == null) {
                 return@withContext Result.failure(Exception("Error al decodificar mapa de bits"))

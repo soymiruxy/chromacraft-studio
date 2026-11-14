@@ -198,7 +198,7 @@ private fun AdjustSubPalette(uiState: EditorUiState, onIntent: (EditorIntent) ->
             "Luces" -> adjustments.highlights to { v: Float -> onIntent(EditorIntent.UpdateAdjustments(adjustments.copy(highlights = v))) }
             "Temperatura" -> adjustments.temperature to { v: Float -> onIntent(EditorIntent.UpdateAdjustments(adjustments.copy(temperature = v))) }
             "Tinte" -> adjustments.tint to { v: Float -> onIntent(EditorIntent.UpdateAdjustments(adjustments.copy(tint = v))) }
-            else -> 0f to {}
+            else -> 0f to { _: Float -> }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 2.dp)) {
