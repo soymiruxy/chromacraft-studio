@@ -39,17 +39,17 @@ object TransformEngine {
         flipVertical: Boolean = false
     ): Matrix {
         val matrix = Matrix()
-        val halfW = intrinsicWidth / 2f
-        val halfH = intrinsicHeight / 2f
+        val centerX = intrinsicWidth / 2f + translationX
+        val centerY = intrinsicHeight / 2f + translationY
 
-        matrix.preTranslate(translationX, translationY)
+        matrix.preTranslate(centerX, centerY)
         matrix.preRotate(rotationDegrees)
 
         val flipSx = if (flipHorizontal) -scaleX else scaleX
         val flipSy = if (flipVertical) -scaleY else scaleY
         matrix.preScale(flipSx, flipSy)
 
-        matrix.preTranslate(-halfW, -halfH)
+        matrix.preTranslate(-intrinsicWidth / 2f, -intrinsicHeight / 2f)
 
         return matrix
     }
@@ -69,6 +69,9 @@ object TransformEngine {
         val halfW = (width / 2f) * scaleX
         val halfH = (height / 2f) * scaleY
 
+        val centerX = width / 2f + translationX
+        val centerY = height / 2f + translationY
+
         val rad = Math.toRadians(rotationDegrees.toDouble())
         val cosA = cos(rad).toFloat()
         val sinA = sin(rad).toFloat()
@@ -85,8 +88,8 @@ object TransformEngine {
             val (rx, ry) = corners[i]
             val rotatedX = rx * cosA - ry * sinA
             val rotatedY = rx * sinA + ry * cosA
-            result[i * 2] = translationX + rotatedX
-            result[i * 2 + 1] = translationY + rotatedY
+            result[i * 2] = centerX + rotatedX
+            result[i * 2 + 1] = centerY + rotatedY
         }
         return result
     }
@@ -98,7 +101,7 @@ object TransformEngine {
         touchX: Float,
         touchY: Float,
         corners: FloatArray,
-        handleRadiusPx: Float = 48f
+        handleRadiusPx: Float = 64f
     ): GizmoHandle {
         val tlX = corners[0]; val tlY = corners[1]
         val trX = corners[2]; val trY = corners[3]
@@ -110,11 +113,7 @@ object TransformEngine {
         if (hypot(touchX - brX, touchY - brY) <= handleRadiusPx) return GizmoHandle.SCALE_ROTATE
         if (hypot(touchX - blX, touchY - blY) <= handleRadiusPx) return GizmoHandle.LOCK_TOGGLE
 
-        if (isPointInPolygon(touchX, touchY, corners)) {
-            return GizmoHandle.BODY
-        }
-
-        return GizmoHandle.NONE
+        return GizmoHandle.BODY
     }
 
     private fun isPointInPolygon(px: Float, py: Float, corners: FloatArray): Boolean {

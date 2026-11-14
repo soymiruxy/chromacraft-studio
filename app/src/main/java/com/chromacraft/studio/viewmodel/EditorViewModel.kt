@@ -265,13 +265,24 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
             is EditorIntent.AddStroke -> {
                 val state = _uiState.value
-                val activeLayerId = state.selectedLayerId
-                val layers = state.layers.map { layer ->
-                    if (layer.id == activeLayerId && layer is DrawingLayer) {
+                val hasDrawingLayer = state.layers.any { it is DrawingLayer }
+                val targetLayers = if (!hasDrawingLayer) {
+                    val newDrawLayer = DrawingLayer(name = "Dibujo")
+                    state.layers + newDrawLayer
+                } else {
+                    state.layers
+                }
+                val activeDrawingId = if (state.selectedLayer is DrawingLayer) {
+                    state.selectedLayerId
+                } else {
+                    targetLayers.filterIsInstance<DrawingLayer>().last().id
+                }
+                val updated = targetLayers.map { layer ->
+                    if (layer.id == activeDrawingId && layer is DrawingLayer) {
                         layer.copy(strokes = layer.strokes + intent.stroke)
                     } else layer
                 }
-                _uiState.update { it.copy(layers = layers) }
+                _uiState.update { it.copy(layers = updated, selectedLayerId = activeDrawingId) }
                 triggerAutoSave()
             }
 

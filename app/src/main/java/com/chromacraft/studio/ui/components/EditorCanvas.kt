@@ -7,11 +7,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -26,6 +25,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.chromacraft.studio.core.graphics.CanvasEngine
 import com.chromacraft.studio.core.graphics.TransformEngine
@@ -39,11 +39,11 @@ import kotlin.math.hypot
 
 /**
  * Lienzo principal interactivo con soporte para:
- * - Renderizado de capas con aceleración por hardware.
- * - Zoom & Pan libre (Pinch-to-zoom y desplazamiento con dos dedos).
- * - Dibujo con sensibilidad a la presión del stylus (S-Pen / Stylus API) e interpolación Bézier.
- * - Herramienta de selección por lazo poligonal (Cutout).
- * - Gizmo de transformación multitáctil de Picsart.
+ * - Ajuste dinámico responsivo en pantalla sin deformación de aspecto.
+ * - Zoom & Pan libre con doble toque para restablecer.
+ * - Manipulación táctil suave y directa 1:1 de capas (Gizmo de Picsart).
+ * - Dibujo con sensibilidad a la presión del stylus e interpolación Bézier.
+ * - Herramienta de selección por lazo (Cutout).
  */
 @Composable
 fun EditorCanvas(
@@ -51,6 +51,7 @@ fun EditorCanvas(
     onIntent: (EditorIntent) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
     val currentStrokePoints = remember { mutableStateListOf<Offset>() }
     val currentStrokePressures = remember { mutableStateListOf<Float>() }
     var activeGizmoHandle by remember { mutableStateOf(TransformEngine.GizmoHandle.NONE) }
@@ -65,24 +66,48 @@ fun EditorCanvas(
     var initialLayerScale by remember { mutableFloatStateOf(1f) }
     var initialLayerRotation by remember { mutableFloatStateOf(0f) }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .background(StudioBlack),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(
+        val containerWidth = constraints.maxWidth.toFloat()
+        val containerHeight = constraints.maxHeight.toFloat()
+
+        // Dimensiones del lienzo preservando relación de aspecto exacta del proyecto
+        val safeProjW = uiState.canvasWidth.toFloat().coerceAtLeast(100f)
+        val safeProjH = uiState.canvasHeight.toFloat().coerceAtLeast(100f)
+        val canvasAspect = safeProjW / safeProjH
+        val containerAspect = containerWidth / containerHeight.coerceAtLeast(1f)
+
+        val paddingPx = with(density) { 24.dp.toPx() }
+        val availableW = (containerWidth - paddingPx).coerceAtLeast(100f)
+        val availableH = (containerHeight - paddingPx).coerceAtLeast(100f)
+
+        val (fittedWidth, fittedHeight) = if (canvasAspect > containerAspect) {
+            val w = availableW
+            val h = w / canvasAspect
+            Pair(w, h)
+        } else {
+            val h = availableH
+            val w = h * canvasAspect
+            Pair(w, h)
+        }
+
+        val canvasWidthDp = with(density) { fittedWidth.toDp() }
+        val canvasHeightDp = with(density) { fittedHeight.toDp() }
+
+        Box(
             modifier = Modifier
-                .aspectRatio(uiState.canvasWidth.toFloat() / uiState.canvasHeight.toFloat())
-                .fillMaxSize()
-                .padding(16.dp)
+                .size(canvasWidthDp, canvasHeightDp)
                 .graphicsLayer(
                     scaleX = viewportScale,
                     scaleY = viewportScale,
                     translationX = viewportPan.x,
                     translationY = viewportPan.y
                 )
-                // Doble toque para restablecer zoom/pan
+                // Doble toque para restablecer zoom y paneo
                 .pointerInput(Unit) {
                     detectTapGestures(
                         onDoubleTap = {
@@ -91,7 +116,7 @@ fun EditorCanvas(
                         }
                     )
                 }
-                .pointerInput(uiState.activeTool, uiState.selectedLayerId) {
+                .pointerInput(uiState.activeTool, uiState.selectedLayerId, fittedWidth, fittedHeight) {
                     when (uiState.activeTool) {
                         ToolType.DRAW -> {
                             detectDragGestures(
@@ -144,14 +169,14 @@ fun EditorCanvas(
                         }
 
                         else -> {
-                            // Modo Transformación de Gizmo o Selección
+                            // Manipulación libre de capas mediante Gizmo (Picsart style)
                             detectDragGestures(
                                 onDragStart = { touchOffset ->
                                     val selected = uiState.selectedLayer
                                     if (selected != null && !selected.isLocked) {
                                         val corners = TransformEngine.getTransformedCorners(
-                                            width = uiState.canvasWidth.toFloat(),
-                                            height = uiState.canvasHeight.toFloat(),
+                                            width = fittedWidth,
+                                            height = fittedHeight,
                                             translationX = selected.translationX,
                                             translationY = selected.translationY,
                                             scaleX = selected.scaleX,
@@ -163,7 +188,7 @@ fun EditorCanvas(
                                             touchX = touchOffset.x,
                                             touchY = touchOffset.y,
                                             corners = corners,
-                                            handleRadiusPx = 56f
+                                            handleRadiusPx = with(density) { 36.dp.toPx() }
                                         )
 
                                         when (activeGizmoHandle) {
@@ -177,9 +202,16 @@ fun EditorCanvas(
                                                 activeGizmoHandle = TransformEngine.GizmoHandle.NONE
                                             }
 
+                                            TransformEngine.GizmoHandle.LOCK_TOGGLE -> {
+                                                onIntent(EditorIntent.LockLayer(selected.id, !selected.isLocked))
+                                                activeGizmoHandle = TransformEngine.GizmoHandle.NONE
+                                            }
+
                                             TransformEngine.GizmoHandle.SCALE_ROTATE -> {
-                                                val dx = touchOffset.x - selected.translationX
-                                                val dy = touchOffset.y - selected.translationY
+                                                val layerCenterX = fittedWidth / 2f + selected.translationX
+                                                val layerCenterY = fittedHeight / 2f + selected.translationY
+                                                val dx = touchOffset.x - layerCenterX
+                                                val dy = touchOffset.y - layerCenterY
                                                 initialDistToCenter = hypot(dx, dy).coerceAtLeast(1f)
                                                 initialAngleToCenter = Math.toDegrees(atan2(dy, dx).toDouble()).toFloat()
                                                 initialLayerScale = selected.scaleX
@@ -198,11 +230,14 @@ fun EditorCanvas(
 
                                     when (activeGizmoHandle) {
                                         TransformEngine.GizmoHandle.BODY -> {
+                                            // Desplazamiento suave directo 1:1 bajo el dedo
+                                            val dx = dragAmount.x / viewportScale
+                                            val dy = dragAmount.y / viewportScale
                                             onIntent(
                                                 EditorIntent.UpdateLayerTransform(
                                                     layerId = selected.id,
-                                                    translationX = selected.translationX + dragAmount.x,
-                                                    translationY = selected.translationY + dragAmount.y,
+                                                    translationX = selected.translationX + dx,
+                                                    translationY = selected.translationY + dy,
                                                     scaleX = selected.scaleX,
                                                     scaleY = selected.scaleY,
                                                     rotationDegrees = selected.rotationDegrees
@@ -211,9 +246,11 @@ fun EditorCanvas(
                                         }
 
                                         TransformEngine.GizmoHandle.SCALE_ROTATE -> {
+                                            val layerCenterX = fittedWidth / 2f + selected.translationX
+                                            val layerCenterY = fittedHeight / 2f + selected.translationY
                                             val (factor, deltaAngle) = TransformEngine.computeScaleAndRotation(
-                                                centerX = selected.translationX,
-                                                centerY = selected.translationY,
+                                                centerX = layerCenterX,
+                                                centerY = layerCenterY,
                                                 touchX = change.position.x,
                                                 touchY = change.position.y,
                                                 initialDistance = initialDistToCenter,
@@ -245,53 +282,55 @@ fun EditorCanvas(
                     }
                 }
         ) {
-            drawIntoCanvas { canvas ->
-                val nativeCanvas = canvas.nativeCanvas
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawIntoCanvas { canvas ->
+                    val nativeCanvas = canvas.nativeCanvas
 
-                // Fondo ajedrezado si la transparencia está activa
-                if (uiState.transparentBackground) {
-                    drawCheckerboard(nativeCanvas, size.width, size.height)
-                }
+                    // Fondo ajedrezado si la transparencia está activa
+                    if (uiState.transparentBackground) {
+                        drawCheckerboard(nativeCanvas, size.width, size.height)
+                    }
 
-                // 1. Renderizar capas
-                CanvasEngine.renderLayers(
-                    canvas = nativeCanvas,
-                    layers = uiState.layers,
-                    targetWidth = size.width.toInt(),
-                    targetHeight = size.height.toInt(),
-                    drawBackground = !uiState.transparentBackground
-                )
-
-                // 2. Trazo en curso
-                if (uiState.activeTool == ToolType.DRAW && currentStrokePoints.size > 1) {
-                    val tempStroke = StrokePath(
-                        points = currentStrokePoints.toList(),
-                        pressures = currentStrokePressures.toList(),
-                        brushType = uiState.brushProperties.brushType,
-                        color = uiState.brushProperties.color,
-                        strokeWidth = uiState.brushProperties.size,
-                        opacity = uiState.brushProperties.opacity,
-                        isEraser = uiState.brushProperties.isEraser
+                    // 1. Renderizar capas con aceleración de hardware
+                    CanvasEngine.renderLayers(
+                        canvas = nativeCanvas,
+                        layers = uiState.layers,
+                        targetWidth = size.width.toInt(),
+                        targetHeight = size.height.toInt(),
+                        drawBackground = !uiState.transparentBackground
                     )
-                    val p = com.chromacraft.studio.core.graphics.BrushEngine.createPaintForStroke(tempStroke)
-                    val path = com.chromacraft.studio.core.graphics.BrushEngine.createSmoothPath(currentStrokePoints.toList())
-                    nativeCanvas.drawPath(path, p)
-                }
 
-                // 3. Trazado de selección por lazo
-                if (uiState.activeTool == ToolType.CUTOUT && uiState.lassoPoints.size > 1) {
-                    drawLassoPath(nativeCanvas, uiState.lassoPoints)
-                }
+                    // 2. Trazo en curso en tiempo real
+                    if (uiState.activeTool == ToolType.DRAW && currentStrokePoints.size > 1) {
+                        val tempStroke = StrokePath(
+                            points = currentStrokePoints.toList(),
+                            pressures = currentStrokePressures.toList(),
+                            brushType = uiState.brushProperties.brushType,
+                            color = uiState.brushProperties.color,
+                            strokeWidth = uiState.brushProperties.size,
+                            opacity = uiState.brushProperties.opacity,
+                            isEraser = uiState.brushProperties.isEraser
+                        )
+                        val p = com.chromacraft.studio.core.graphics.BrushEngine.createPaintForStroke(tempStroke)
+                        val path = com.chromacraft.studio.core.graphics.BrushEngine.createSmoothPath(currentStrokePoints.toList())
+                        nativeCanvas.drawPath(path, p)
+                    }
 
-                // 4. Gizmo de Picsart
-                val selected = uiState.selectedLayer
-                if (selected != null && uiState.activeTool != ToolType.DRAW && uiState.activeTool != ToolType.CROP && uiState.activeTool != ToolType.CUTOUT) {
-                    drawGizmo(
-                        nativeCanvas = nativeCanvas,
-                        width = size.width,
-                        height = size.height,
-                        layer = selected
-                    )
+                    // 3. Trazado de selección por lazo
+                    if (uiState.activeTool == ToolType.CUTOUT && uiState.lassoPoints.size > 1) {
+                        drawLassoPath(nativeCanvas, uiState.lassoPoints)
+                    }
+
+                    // 4. Gizmo interactivo de Picsart
+                    val selected = uiState.selectedLayer
+                    if (selected != null && uiState.activeTool != ToolType.DRAW && uiState.activeTool != ToolType.CROP && uiState.activeTool != ToolType.CUTOUT) {
+                        drawGizmo(
+                            nativeCanvas = nativeCanvas,
+                            width = size.width,
+                            height = size.height,
+                            layer = selected
+                        )
+                    }
                 }
             }
         }
@@ -384,9 +423,9 @@ private fun drawGizmo(
         style = AndroidPaint.Style.FILL
     }
 
-    val radius = 22f
+    val radius = 24f
 
-    // 1. Eliminar
+    // 1. Esquina Superior Izquierda: Eliminar capa
     nativeCanvas.drawCircle(corners[0], corners[1], radius, deletePaint)
     val xPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
@@ -397,7 +436,7 @@ private fun drawGizmo(
     nativeCanvas.drawLine(corners[0] - d, corners[1] - d, corners[0] + d, corners[1] + d, xPaint)
     nativeCanvas.drawLine(corners[0] + d, corners[1] - d, corners[0] - d, corners[1] + d, xPaint)
 
-    // 2. Duplicar
+    // 2. Esquina Superior Derecha: Duplicar capa
     nativeCanvas.drawCircle(corners[2], corners[3], radius, handleBgPaint)
     val dupPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
         color = 0xFF7C4DFF.toInt()
@@ -407,7 +446,7 @@ private fun drawGizmo(
     nativeCanvas.drawRect(corners[2] - 7f, corners[3] - 7f, corners[2] + 4f, corners[3] + 4f, dupPaint)
     nativeCanvas.drawRect(corners[2] - 4f, corners[3] - 4f, corners[2] + 7f, corners[3] + 7f, dupPaint)
 
-    // 3. Escalar / Rotar
+    // 3. Esquina Inferior Derecha: Escalar / Rotar
     nativeCanvas.drawCircle(corners[4], corners[5], radius, handleAccentPaint)
     val rotateArrowPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.WHITE
@@ -416,6 +455,13 @@ private fun drawGizmo(
     }
     nativeCanvas.drawCircle(corners[4], corners[5], 10f, rotateArrowPaint)
 
-    // 4. Anclaje
-    nativeCanvas.drawCircle(corners[6], corners[7], 12f, handleBgPaint)
+    // 4. Esquina Inferior Izquierda: Bloqueo / Desbloqueo
+    nativeCanvas.drawCircle(corners[6], corners[7], radius * 0.85f, handleBgPaint)
+    val lockPaint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
+        color = 0xFF7C4DFF.toInt()
+        strokeWidth = 2f
+        style = AndroidPaint.Style.STROKE
+    }
+    nativeCanvas.drawCircle(corners[6], corners[7] - 3f, 5f, lockPaint)
+    nativeCanvas.drawRect(corners[6] - 6f, corners[7] - 2f, corners[6] + 6f, corners[7] + 6f, lockPaint)
 }
