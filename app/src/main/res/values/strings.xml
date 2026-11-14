@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">ChromaCraft Studio</string>
+    <string name="tool_crop">Recortar</string>
+    <string name="tool_adjust">Ajustar</string>
+    <string name="tool_filters">Filtros</string>
+    <string name="tool_draw">Dibujar</string>
+    <string name="tool_text">Texto</string>
+    <string name="tool_sticker">Stickers</string>
+    <string name="tool_layers">Capas</string>
+    <string name="export">Exportar</string>
+    <string name="undo">Deshacer</string>
+    <string name="redo">Rehacer</string>
+    <string name="apply">Aplicar</string>
+    <string name="cancel">Cancelar</string>
+</resources>
